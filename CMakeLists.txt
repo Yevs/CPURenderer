@@ -5,4 +5,5 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 set(SOURCE_FILES main.cpp)
 configure_file(obj/african_head.obj obj/african_head.obj COPYONLY)
-add_executable(CPURenderer ${SOURCE_FILES} tgaimage.cpp tgaimage.h geometry.h Model.cpp Model.h)
+configure_file(obj/african_head_diffuse.tga obj/african_head_diffuse.tga COPYONLY)
+add_executable(CPURenderer ${SOURCE_FILES} tgaimage.cpp tgaimage.h geometry.h Model.cpp Model.h geometry.cpp)

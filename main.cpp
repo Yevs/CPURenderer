@@ -1,7 +1,6 @@
 #include "tgaimage.h"
 #include "Model.h"
 #include <algorithm>
-#include <cmath>
 #include <string.h>
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
@@ -10,6 +9,8 @@ const TGAColor red = TGAColor(255, 0, 0, 255);
 Model *model = NULL;
 
 bool isDegenerated(Vec3i vec3, Vec3i t1, Vec3i t2);
+
+int* getBoundBox(const Vec3i &t0, const Vec3i &t1, const Vec3i &t2);
 
 const int width = 800;
 const int height = 800;
@@ -63,22 +64,49 @@ bool insideTriangle(int x, int y, Vec3i t0, Vec3i t1, Vec3i t2) {
            vectorProd(c, a) * vectorProd(a, b) >= 0;
 }
 
-void triangle(Vec3i t0, Vec3i t1, Vec3i t2, int* zbuf, TGAImage& image, const TGAColor& color) {
+void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
+              float intensity, int* zbuf, TGAImage& image) {
     if (isDegenerated(t0,t1,t2)) return;
-    int boundbox[4] = {std::min(t0.x, std::min(t1.x, t2.x)), std::min(t0.y, std::min(t1.y, t2.y)),
-                       std::max(t0.x, std::max(t1.x, t2.x)), std::max(t0.y, std::max(t1.y, t2.y))};
+    if (t0.y > t1.y) {
+        std::swap(t0, t1);
+        std::swap(uv0, uv1);
+    }
+    if (t0.y > t2.y) {
+        std::swap(t0, t2);
+        std::swap(uv0, uv2);
+    }
+    if (t1.y > t2.y) {
+        std::swap(t1, t2);
+        std::swap(uv1, uv2);
+    }
+    int* boundbox = getBoundBox(t0, t1, t2);
+    Vec2i vertex(t1.x - t0.x, t1.y - t0.y);
     for (int x = boundbox[0]; x <= boundbox[2]; x++) {
         for (int y = boundbox[1]; y <= boundbox[3]; y++) {
             if (insideTriangle(x, y, t0, t1, t2)) {
                 int idx = x + y * width;
                 int z = find_z(x, y, t0, t1, t2);
+                Vec2i tmpVect(x - t0.x, y - t0.y);
+                float alpha = vertex * tmpVect / (vertex.norm() * tmpVect.norm());
+                Vec2i tmpUv(uv1.x - uv0.x, uv1.y - uv0.y);
+                Vec2f uvP(uv0.x + tmpUv.x * cos(alpha) + tmpUv.y * sin(alpha),
+                          uv0.y - tmpUv.x * sin(alpha) + tmpUv.y * cos(alpha));
+                uvP.normalize();
+                uvP = uvP * tmpVect.norm();
                 if (zbuf[idx] < z) {
                     zbuf[idx] =  z;
-                    image.set(x, y, color);
+                    TGAColor color = model->getDiffusive(uvP);
+                    image.set(x, y, TGAColor(color.r * intensity , color.g * intensity , color.b * intensity , 255));
                 }
             }
         }
     }
+    delete[] boundbox;
+}
+
+int* getBoundBox(const Vec3i &t0, const Vec3i &t1, const Vec3i &t2) {
+    return new int[4]{std::min(t0.x, std::min(t1.x, t2.x)), std::min(t0.y, std::min(t1.y, t2.y)),
+                       std::max(t0.x, std::max(t1.x, t2.x)), std::max(t0.y, std::max(t1.y, t2.y))};
 }
 
 bool isDegenerated(Vec3i t0, Vec3i t1, Vec3i t2) {
@@ -108,11 +136,11 @@ int main(int argc, char** argv) {
     int* zbuffer = new int[width*height];
     memset(zbuffer, std::numeric_limits<int>::min(), sizeof(zbuffer));
     for (int i = 0; i < model->nfaces(); i++) {
-        std::vector<int> face = model->face(i);
+        std::vector<Vec3i> face = model->face(i);
         Vec3i screen_coords[3];
         Vec3f world_coords[3];
         for (int j = 0; j < 3; j++) {
-            Vec3f v = model->vert(face[j]);
+            Vec3f v = model->vert(face[j].x);
             world_coords[j] = v;
             screen_coords[j] = Vec3i((v.x+1.)*width/2., (v.y+1.)*height/2., (v.z + 1.) * depth / 2.);
         }
@@ -120,12 +148,17 @@ int main(int argc, char** argv) {
         n.normalize();
         float intensity = n * light_dir;
         if (intensity > 0) {
-            triangle(screen_coords[0], screen_coords[1], screen_coords[2], zbuffer, image,
-                     TGAColor(intensity*255, intensity*255, intensity*255, 255));
+            Vec2i uv[3];
+            for (int k=0; k<3; k++) {
+                uv[k] = model->uv(i, k);
+            }
+            triangle(screen_coords[0], screen_coords[1], screen_coords[2],
+                     uv[0], uv[1], uv[2], intensity, zbuffer, image);
         }
     }
     image.flip_vertically();
     image.write_tga_file("/home/eugene/Documents/image.tga");
     delete model;
+    delete[] zbuffer;
     return 0;
 }
