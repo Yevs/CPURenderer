@@ -28,6 +28,11 @@ Model::Model(const char *filename) {
             Vec2f uv;
             iss >> uv.x >> uv.y;
             uv_.push_back(uv);
+        } else if (!line.compare(0, 3, "vn ")){
+            iss >> trash >> trash;
+            Vec3f vn;
+            iss >> vn.x >> vn.y >> vn.z;
+            vn_.push_back(vn);
         } else if (!line.compare(0, 2, "f ")) {
             std::vector<Vec3i> f;
             int itrash;

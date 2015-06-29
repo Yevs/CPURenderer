@@ -14,6 +14,7 @@ private:
     std::vector<Vec3f> verts_;
     std::vector<std::vector<Vec3i>> faces_;
     std::vector<Vec2f> uv_;
+    std::vector<Vec3f> vn_;
     TGAImage _diffusemap;
 
 public:

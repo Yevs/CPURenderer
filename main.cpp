@@ -81,18 +81,23 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, Vec2i uv0, Vec2i uv1, Vec2i uv2,
     }
     int* boundbox = getBoundBox(t0, t1, t2);
     Vec2i vertex(t1.x - t0.x, t1.y - t0.y);
+    Vec2i tmpUv(uv1.x - uv0.x, uv1.y - uv0.y);
     for (int x = boundbox[0]; x <= boundbox[2]; x++) {
         for (int y = boundbox[1]; y <= boundbox[3]; y++) {
             if (insideTriangle(x, y, t0, t1, t2)) {
                 int idx = x + y * width;
                 int z = find_z(x, y, t0, t1, t2);
-                Vec2i tmpVect(x - t0.x, y - t0.y);
-                float alpha = vertex * tmpVect / (vertex.norm() * tmpVect.norm());
-                Vec2i tmpUv(uv1.x - uv0.x, uv1.y - uv0.y);
-                Vec2f uvP(uv0.x + tmpUv.x * cos(alpha) + tmpUv.y * sin(alpha),
-                          uv0.y - tmpUv.x * sin(alpha) + tmpUv.y * cos(alpha));
-                uvP.normalize();
-                uvP = uvP * tmpVect.norm();
+                Vec2i P(x, y), v(t0.x, t0.y);
+                Vec2i s01(t1.x - t0.x, t1.y - t0.y), s02(t2.x - t0.x, t2.y - t0.y), sp0(t0.x - P.x, t0.y - P.y);
+                Vec3i tmp1(s01.x, s02.x, sp0.x), tmp2(s01.y, s02.y, sp0.y);
+                Vec3i tmp3 = tmp1 ^ tmp2;
+                Vec3f res(tmp3.x, tmp3.y, tmp3.z);
+                if (res.z != 0) {
+                    res = res * (1 / res.z);
+                } else {
+                    continue;
+                }
+                Vec2f uvP =  uv0 * (1 - res.x - res.y) + uv1 * res.x + uv2 * res.y;
                 if (zbuf[idx] < z) {
                     zbuf[idx] =  z;
                     TGAColor color = model->getDiffusive(uvP);
